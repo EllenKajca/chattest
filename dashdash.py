@@ -4,7 +4,7 @@ import time
 
 assistant_id = "asst_rYaX0E7TOLCiR3Z3TXrCVC19"
 
-client = openai(api_key=st.secrets["openai_api_key"])
+client = openai
 
 if "start_chat" not in st.session_state:
     st.session_state.start_chat = False
@@ -12,6 +12,8 @@ if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
 
 st.set_page_config(page_title="CatGPT", page_icon=":speech_balloon:")
+
+openai.api_key = openai(api_key=st.secrets["openai_api_key"])
 
 if st.sidebar.button("Start Chat"):
     st.session_state.start_chat = True
