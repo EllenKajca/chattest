@@ -1,6 +1,5 @@
-
 import streamlit as st
-from openai import OpenAI, OpenAIError
+import openai
 import time
 
 # Define the function to fetch the latest run response
