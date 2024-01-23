@@ -13,7 +13,6 @@ if "thread_id" not in st.session_state:
 
 st.set_page_config(page_title="CatGPT", page_icon=":speech_balloon:")
 
-openai.api_key = "ssk-uNfGJWGsLQsKe6sl0wngT3BlbkFJpWoqZG84J9g89AlNjgf8"
 
 if st.sidebar.button("Start Chat"):
     st.session_state.start_chat = True
