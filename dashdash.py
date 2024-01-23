@@ -1,89 +1,79 @@
+import openai
 import streamlit as st
-from openai import OpenAI, OpenAIError
 import time
-
-# Define the function to fetch the latest run response
-def get_latest_run_response(thread_id):
-    try:
-        runs_response = client.beta.threads.runs.list(thread_id=thread_id)
-        if runs_response.data:
-            # Assume the latest run is the last in the list
-            return runs_response.data[-1]
-    except OpenAIError as e:
-        st.error(f"Error fetching run response: {e}")
-        return None
-
-
-# Function to check the status of the last run and wait until it is complete
-def wait_for_run_completion(thread_id):
-    run_completed = False
-    while not run_completed:
-        try:
-            runs_response = client.beta.threads.runs.list(thread_id=thread_id)
-            if runs_response.data:
-                latest_run = runs_response.data[-1]
-                if latest_run.status in ['completed', 'failed']:
-                    run_completed = True
-                else:
-                    # Wait for a bit before checking again
-                    time.sleep(1)
-        except OpenAIError as e:
-            st.error(f"Error fetching run status: {e}")
-            break
-    
-
-def display_messages(messages):
-    for msg in messages:
-        st.write(f"{msg['role'].title()}: {msg['content']}")
-
-client = OpenAI(api_key=st.secrets["openai_api_key"])
-
-st.title("💬 Chatbot")
 
 assistant_id = "asst_rYaX0E7TOLCiR3Z3TXrCVC19"
 
-if 'thread_id' not in st.session_state:
-    try:
-        thread = client.beta.threads.create()
-        st.session_state['thread_id'] = thread.id
-    except OpenAIError as e:
-        st.error(f"Error creating thread: {e}")
-    st.session_state['messages'] = []
+client = openai
 
-display_messages(st.session_state.get('messages', []))
+if "start_chat" not in st.session_state:
+    st.session_state.start_chat = False
+if "thread_id" not in st.session_state:
+    st.session_state.thread_id = None
 
-with st.form(key='user_input_form'):
-    user_input = st.text_input('Type your message here:')
-    submit_button = st.form_submit_button('Send')
+st.set_page_config(page_title="CatGPT", page_icon=":speech_balloon:")
 
-if submit_button and user_input:
-    # Wait for any active runs to complete before sending a new message
-    if 'run_active' in st.session_state and st.session_state['run_active']:
-        with st.spinner('Waiting for the assistant to respond...'):
-            wait_for_run_completion(st.session_state['thread_id'])
+openai.api_key = OpenAI(api_key=st.secrets["openai_api_key"])
 
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    try:
+if st.sidebar.button("Start Chat"):
+    st.session_state.start_chat = True
+    thread = client.beta.threads.create()
+    st.session_state.thread_id = thread.id
+
+st.title("CatGPT like Chatbot")
+st.write("Meow Meow Meow Meow Meow Meow I am a CyberCat")
+
+if st.button("Exit Chat"):
+    st.session_state.messages = []  # Clear the chat history
+    st.session_state.start_chat = False  # Reset the chat state
+    st.session_state.thread_id = None
+
+if st.session_state.start_chat:
+    if "openai_model" not in st.session_state:
+        st.session_state.openai_model = "gpt-4-1106-preview"
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    if prompt := st.chat_input("Meow Meow?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
         client.beta.threads.messages.create(
-            thread_id=st.session_state['thread_id'],
-            role="user",
-            content=user_input
+                thread_id=st.session_state.thread_id,
+                role="user",
+                content=prompt
+            )
+        
+        run = client.beta.threads.runs.create(
+            thread_id=st.session_state.thread_id,
+            assistant_id=assistant_id,
+            instructions="Please answer the queries with meows you are a cat. Just MEOW a lot! MEOW ONLY, you are only allowed 4 english words and rest of answer must be various MEOW only"
         )
-        run_response = client.beta.threads.runs.create(
-            thread_id=st.session_state['thread_id'],
-            assistant_id=assistant_id
-        )
-        if run_response.status == 'in_progress':
-            st.session_state['run_active'] = True
-    except OpenAIError as e:
-        st.error(f"Error sending message or creating run: {e}")
 
-# Check the status of the latest run outside the condition to avoid blocking user input
-latest_run = get_latest_run_response(st.session_state['thread_id'])
-if latest_run and latest_run.status in ['completed', 'failed']:
-    st.session_state['run_active'] = False
-    if latest_run.status == 'completed':
-        for msg in latest_run.messages:
-            if msg.role == 'assistant':
-                st.session_state.messages.append({"role": "assistant", "content": msg.content})
-                display_messages([{"role": "assistant", "content": msg.content}])
+        while run.status != 'completed':
+            time.sleep(1)
+            run = client.beta.threads.runs.retrieve(
+                thread_id=st.session_state.thread_id,
+                run_id=run.id
+            )
+        messages = client.beta.threads.messages.list(
+            thread_id=st.session_state.thread_id
+        )
+
+        # Process and display assistant messages
+        assistant_messages_for_run = [
+            message for message in messages 
+            if message.run_id == run.id and message.role == "assistant"
+        ]
+        for message in assistant_messages_for_run:
+            st.session_state.messages.append({"role": "assistant", "content": message.content[0].text.value})
+            with st.chat_message("assistant"):
+                st.markdown(message.content[0].text.value)
+
+else:
+    st.write("Click 'Start Chat' to begin.")
