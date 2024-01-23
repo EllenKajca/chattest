@@ -5,6 +5,7 @@ Created on Mon Jan 22 18:18:26 2024
 
 @author: deverusadmin
 """
+
 import streamlit as st
 from openai import OpenAI, OpenAIError
 import time
@@ -69,6 +70,7 @@ if submit_button and user_input:
             role="user",
             content=user_input
         )
+        st.write("User message sent, awaiting run to initiate...")
         # Create a run
         run_response = client.beta.threads.runs.create(
             thread_id=st.session_state['thread_id'],
@@ -76,17 +78,27 @@ if submit_button and user_input:
         )
         if run_response.status == 'in_progress':
             st.session_state['run_active'] = True
+            st.write("Run initiated, waiting for the assistant's response...")
+        else:
+            st.error(f"Run could not be initiated, status: {run_response.status}")
     except OpenAIError as e:
         st.error(f"Error sending message or creating run: {e}")
 
 # Continuously check for responses from the assistant
 if st.session_state.get('run_active', False):
-    latest_run = get_latest_run_response(st.session_state['thread_id'])
-    if latest_run and latest_run.status in ['completed', 'failed']:
-        st.session_state['run_active'] = False
-        if latest_run.status == 'completed':
-            # Fetch and display assistant messages
-            assistant_messages = get_assistant_messages(st.session_state['thread_id'])
-            for msg in assistant_messages:
-                st.session_state.messages.append({"role": "assistant", "content": msg['content']})
-            display_messages(assistant_messages)
+    with st.spinner('Waiting for assistant’s response...'):
+        latest_run = get_latest_run_response(st.session_state['thread_id'])
+        if latest_run:
+            st.write(f"Latest run status: {latest_run.status}")
+            if latest_run.status in ['completed', 'failed']:
+                st.session_state['run_active'] = False
+                if latest_run.status == 'completed':
+                    st.write("Run completed, retrieving messages...")
+                    assistant_messages = get_assistant_messages(st.session_state['thread_id'])
+                    if assistant_messages:
+                        st.write(f"Retrieved {len(assistant_messages)} assistant message(s).")
+                        for msg in assistant_messages:
+                            st.session_state.messages.append({"role": "assistant", "content": msg['content']})
+                        display_messages(assistant_messages)
+                    else:
+                        st.write("No new assistant messages found.")
