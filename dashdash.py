@@ -1,6 +1,17 @@
 import openai
 import streamlit as st
 import time
+import os 
+
+# Access the API key from the environment variable
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Check if the API key is available
+if openai_api_key:
+    openai.api_key = openai_api_key
+else:
+    st.error("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
+
 
 assistant_id = "asst_rYaX0E7TOLCiR3Z3TXrCVC19"
 
@@ -11,16 +22,17 @@ if "start_chat" not in st.session_state:
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
 
-st.set_page_config(page_title="CatGPT", page_icon=":speech_balloon:")
+st.set_page_config(page_title="Numbers", page_icon=":speech_balloon:")
 
+openai.api_key = ""
 
 if st.sidebar.button("Start Chat"):
     st.session_state.start_chat = True
     thread = client.beta.threads.create()
     st.session_state.thread_id = thread.id
 
-st.title("CatGPT like Chatbot")
-st.write("Meow Meow Meow Meow Meow Meow I am a CyberCat")
+st.title("Numbers Assisstant")
+st.write("Ask me anything about the numbers")
 
 if st.button("Exit Chat"):
     st.session_state.messages = []  # Clear the chat history
@@ -37,7 +49,7 @@ if st.session_state.start_chat:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("Meow Meow?"):
+    if prompt := st.chat_input("Ask me a question about the numbers!"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -51,7 +63,7 @@ if st.session_state.start_chat:
         run = client.beta.threads.runs.create(
             thread_id=st.session_state.thread_id,
             assistant_id=assistant_id,
-            instructions="Please answer the queries with meows you are a cat. Just MEOW a lot! MEOW ONLY, you are only allowed 4 english words and rest of answer must be various MEOW only"
+            instructions="You are a helpful assistant"
         )
 
         while run.status != 'completed':
