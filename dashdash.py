@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Jan 22 18:18:26 2024
 
-@author: deverusadmin
-"""
 
 import streamlit as st
 from openai import OpenAI, OpenAIError
@@ -12,13 +6,20 @@ import time
 
 # Function to fetch the latest run response
 def get_latest_run_response(thread_id):
-    try:
-        runs_response = client.beta.threads.runs.list(thread_id=thread_id)
-        if runs_response.data:
-            return runs_response.data[-1]
-    except OpenAIError as e:
-        st.error(f"Error fetching run response: {e}")
-        return None
+    while True:
+        try:
+            runs_response = client.beta.threads.runs.list(thread_id=thread_id)
+            if runs_response.data:
+                latest_run = runs_response.data[-1]
+                if latest_run.status == 'queued':
+                    # Update the user on the status
+                    st.warning('The system is busy, your request is queued. Waiting for the assistant to respond...')
+                    time.sleep(5)  # Wait for 5 seconds before checking the status again
+                elif latest_run.status in ['completed', 'failed']:
+                    return latest_run
+        except OpenAIError as e:
+            st.error(f"Error fetching run response: {e}")
+            return None
 
 # Function to retrieve the latest messages from a thread
 def get_assistant_messages(thread_id):
@@ -70,35 +71,28 @@ if submit_button and user_input:
             role="user",
             content=user_input
         )
-        st.write("User message sent, awaiting run to initiate...")
+        st.info("User message sent, awaiting run to initiate...")
         # Create a run
         run_response = client.beta.threads.runs.create(
             thread_id=st.session_state['thread_id'],
             assistant_id=assistant_id
         )
-        if run_response.status == 'in_progress':
+        # Poll for run status if queued or in progress
+        if run_response.status in ['in_progress', 'queued']:
             st.session_state['run_active'] = True
-            st.write("Run initiated, waiting for the assistant's response...")
+            with st.spinner("The system is currently busy, your request is being processed. Please wait..."):
+                latest_run = get_latest_run_response(st.session_state['thread_id'])
+                if latest_run and latest_run.status == 'completed':
+                    st.success("The assistant has responded.")
+                    # Fetch and display messages
+                    assistant_messages = get_assistant_messages(st.session_state['thread_id'])
+                    for msg in assistant_messages:
+                        st.session_state.messages.append({"role": "assistant", "content": msg['content']})
+                    display_messages(assistant_messages)
+                elif latest_run and latest_run.status == 'failed':
+                    st.error("The assistant failed to process the request.")
         else:
             st.error(f"Run could not be initiated, status: {run_response.status}")
     except OpenAIError as e:
         st.error(f"Error sending message or creating run: {e}")
 
-# Continuously check for responses from the assistant
-if st.session_state.get('run_active', False):
-    with st.spinner('Waiting for assistant’s response...'):
-        latest_run = get_latest_run_response(st.session_state['thread_id'])
-        if latest_run:
-            st.write(f"Latest run status: {latest_run.status}")
-            if latest_run.status in ['completed', 'failed']:
-                st.session_state['run_active'] = False
-                if latest_run.status == 'completed':
-                    st.write("Run completed, retrieving messages...")
-                    assistant_messages = get_assistant_messages(st.session_state['thread_id'])
-                    if assistant_messages:
-                        st.write(f"Retrieved {len(assistant_messages)} assistant message(s).")
-                        for msg in assistant_messages:
-                            st.session_state.messages.append({"role": "assistant", "content": msg['content']})
-                        display_messages(assistant_messages)
-                    else:
-                        st.write("No new assistant messages found.")
