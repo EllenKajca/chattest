@@ -1,17 +1,9 @@
 import openai
 import streamlit as st
 import time
-import os 
 
-# Access the API key from the environment variable
-openai_api_key = os.getenv("OPENAI_API_KEY")
-
-# Check if the API key is available
-if openai_api_key:
-    openai.api_key = openai_api_key
-else:
-    st.error("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
-
+# Use the API key from st.secrets
+openai.api_key = st.secrets["openai_api_key"]
 
 assistant_id = "asst_rYaX0E7TOLCiR3Z3TXrCVC19"
 
@@ -23,8 +15,6 @@ if "thread_id" not in st.session_state:
     st.session_state.thread_id = None
 
 st.set_page_config(page_title="Numbers", page_icon=":speech_balloon:")
-
-openai.api_key = ""
 
 if st.sidebar.button("Start Chat"):
     st.session_state.start_chat = True
